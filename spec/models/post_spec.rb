@@ -15,13 +15,16 @@ describe Post do
     let(:another_user) { FactoryGirl.create(:user) }
 
     def voted_by(user_id)
-      Post.search(votes_voter_id_in: user_id).result(distinct: true)
+      Post.joins(:votes).where(votes: {voter_id: user_id})
     end
 
     def not_voted_by(user_id)
-     Post.search({
-       g: { '0' => { m: 'or', votes_voteable_id_null: true, votes_voter_id_not_in: user_id } }
-     }).result(distinct: true)
+      Post.find_by_sql([%Q{
+        select posts.* from posts where not exists (
+          select null from votes where voteable_id = posts.id and
+          voteable_type = 'Post' and voter_id = ?
+        )
+      }, user_id])
     end
 
     it { expect(Post.count).to eq(15) }
